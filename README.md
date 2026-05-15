@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RepoCheck — GitHub 仓库体检工具
 
-## Getting Started
+输入公开 GitHub 仓库 URL，自动分析项目健康度并以可视化图表展示关键指标，结合 AI 给出综合评分和改进建议。
 
-First, run the development server:
+## 功能特性
+
+- **仓库搜索** — 输入 GitHub 仓库 URL，一键跳转分析
+- **数据可视化** — 概览卡片、语言分布饼图、提交活跃度柱状图、贡献者排行、健康度雷达图
+- **6 维度健康评分** — 社区活跃度、维护状态、文档完善度、代码质量、Issue 响应率、贡献者多样性
+- **AI 智能评分** — 基于 OpenAI 提供综合评分、各维度评语和改进建议
+- **响应式设计** — 支持桌面端和移动端浏览
+
+## 技术栈
+
+- **框架**: [Next.js 16](https://nextjs.org) (App Router)
+- **语言**: TypeScript
+- **样式**: Tailwind CSS 4
+- **图表**: [Recharts](https://recharts.org)
+- **AI**: [OpenAI API](https://openai.com) (gpt-4o-mini)
+- **数据源**: GitHub REST API v3
+
+## 快速开始
+
+### 环境要求
+
+- Node.js 18+
+- npm
+
+### 安装与运行
 
 ```bash
+# 克隆仓库
+git clone https://github.com/Julyos-rgb/repoCheck.git
+cd repoCheck
+
+# 安装依赖
+npm install
+
+# 配置环境变量（可选，不配置则 AI 评分功能不可用）
+cp .env.local.example .env.local
+# 编辑 .env.local 填入你的 OPENAI_API_KEY
+
+# 启动开发服务器
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开浏览器访问 [http://localhost:3000](http://localhost:3000)。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 生产构建
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+## 环境变量
 
-To learn more about Next.js, take a look at the following resources:
+| 变量名 | 说明 | 必填 |
+|--------|------|------|
+| `OPENAI_API_KEY` | OpenAI API Key，用于 AI 智能评分 | 否 |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> 不配置 `OPENAI_API_KEY` 时，基础的 GitHub 数据分析和可视化功能仍可正常使用，AI 评分部分会显示"AI 评分暂时不可用"。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 开源协议
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[MIT License](./LICENSE) © 2026 Julyos-rgb
