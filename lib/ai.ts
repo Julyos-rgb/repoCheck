@@ -9,9 +9,93 @@ import type {
   AIScoreResult,
 } from "@/types";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+type ProviderConfig = {
+  apiKeyEnv: string;
+  defaultModel: string;
+  baseURL?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+};
+
+const DEFAULT_TIMEOUT = 30000;
+
+const PROVIDERS: Record<string, ProviderConfig> = {
+  openai: {
+    apiKeyEnv: "OPENAI_API_KEY",
+    defaultModel: "gpt-4o-mini",
+  },
+  anthropic: {
+    apiKeyEnv: "ANTHROPIC_API_KEY",
+    defaultModel: "claude-sonnet-4-20250514",
+    baseURL: "https://api.anthropic.com/v1",
+    headers: { "anthropic-version": "2023-06-01" },
+  },
+  deepseek: {
+    apiKeyEnv: "DEEPSEEK_API_KEY",
+    defaultModel: "deepseek-chat",
+    baseURL: "https://api.deepseek.com",
+  },
+  qwen: {
+    apiKeyEnv: "QWEN_API_KEY",
+    defaultModel: "qwen-plus",
+    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  },
+  glm: {
+    apiKeyEnv: "GLM_API_KEY",
+    defaultModel: "glm-4-flash",
+    baseURL: "https://open.bigmodel.cn/api/paas/v4",
+  },
+  moonshot: {
+    apiKeyEnv: "MOONSHOT_API_KEY",
+    defaultModel: "moonshot-v1-8k",
+    baseURL: "https://api.moonshot.cn/v1",
+  },
+  minimax: {
+    apiKeyEnv: "MINIMAX_API_KEY",
+    defaultModel: "MiniMax-Text-01",
+    baseURL: "https://api.minimax.chat/v1",
+  },
+};
+
+function maskApiKey(key: string): string {
+  if (!key || key.length <= 4) return "****";
+  return key.slice(0, 4) + "****";
+}
+
+function getProvider(): {
+  config: ProviderConfig;
+  apiKey: string;
+  provider: string;
+  resolvedBaseURL: string | undefined;
+  resolvedTimeout: number;
+} | null {
+  const providerName = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  const config = PROVIDERS[providerName];
+
+  if (!config) {
+    console.error(`[AI] Unknown provider: ${providerName}, available: ${Object.keys(PROVIDERS).join(", ")}`);
+    return null;
+  }
+
+  const apiKey = process.env[config.apiKeyEnv];
+  if (!apiKey) {
+    console.error(`[AI] API key not configured for provider "${providerName}", env: ${config.apiKeyEnv}`);
+    return null;
+  }
+
+  const customBaseURL = process.env.AI_BASE_URL;
+  const resolvedBaseURL = customBaseURL || config.baseURL;
+
+  const customTimeout = process.env.AI_TIMEOUT_MS;
+  const resolvedTimeout = customTimeout ? parseInt(customTimeout, 10) : (config.timeout || DEFAULT_TIMEOUT);
+
+  console.log(
+    `[AI] provider: ${providerName}, model: ${process.env.AI_MODEL || config.defaultModel}, ` +
+    `baseURL: ${resolvedBaseURL || "default"}, timeout: ${resolvedTimeout}ms, key: ${maskApiKey(apiKey)}`,
+  );
+
+  return { config, apiKey, provider: providerName, resolvedBaseURL, resolvedTimeout };
+}
 
 const SYSTEM_PROMPT = `你是一位资深的 GitHub 项目评审专家，擅长对开源仓库进行全面、客观的综合评估。
 
@@ -57,6 +141,102 @@ const SYSTEM_PROMPT = `你是一位资深的 GitHub 项目评审专家，擅长�
 - summary 要涵盖项目的主要优缺点
 - 严格返回合法 JSON，不要包含任何额外文本或 markdown 格式`;
 
+function validateResult(parsed: unknown): parsed is AIScoreResult {
+  if (!parsed || typeof parsed !== "object") return false;
+  const p = parsed as Record<string, unknown>;
+
+  if (typeof p.total_score !== "number" || p.total_score < 0 || p.total_score > 100) return false;
+  if (typeof p.summary !== "string") return false;
+  if (!Array.isArray(p.dimensions) || !Array.isArray(p.suggestions)) return false;
+
+  for (const dim of p.dimensions) {
+    const d = dim as Record<string, unknown>;
+    if (typeof d.name !== "string" || typeof d.score !== "number" || typeof d.comment !== "string") {
+      return false;
+    }
+  }
+
+  for (const sug of p.suggestions) {
+    if (typeof sug !== "string") return false;
+  }
+
+  return true;
+}
+
+function isAnthropicAPI(baseURL: string | undefined): boolean {
+  if (!baseURL) return false;
+  return baseURL.toLowerCase().includes("anthropic");
+}
+
+async function callAnthropicAPI(
+  baseURL: string,
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  userInput: string,
+  timeout: number,
+): Promise<string | null> {
+  const cleanBaseURL = baseURL.replace(/[,，\s]+$/, "");
+  const path = cleanBaseURL.endsWith("/v1") ? "/messages" : "/v1/messages";
+  const url = `${cleanBaseURL}${path}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userInput }],
+        temperature: 0.3,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`[AI] Anthropic API error: ${response.status} ${response.statusText}`, body.slice(0, 200));
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.success === false || data.code >= 400) {
+      console.error(`[AI] Anthropic API returned error: code=${data.code}, msg=${data.msg}`);
+      return null;
+    }
+
+    console.log("[AI] Anthropic raw response keys:", Object.keys(data).join(", "));
+    console.log("[AI] Anthropic response sample:", JSON.stringify(data).slice(0, 500));
+
+    if (!data.content || !Array.isArray(data.content) || data.content.length === 0) {
+      console.error("[AI] Anthropic API: empty content in response");
+      return null;
+    }
+
+    const textBlock = data.content.find(
+      (block: Record<string, unknown>) => block.type === "text",
+    );
+
+    if (!textBlock || typeof textBlock.text !== "string") {
+      console.error("[AI] Anthropic API: no text block found in response");
+      return null;
+    }
+
+    return textBlock.text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function generateAIScore(params: {
   repoInfo: RepoInfo;
   languages: Language[];
@@ -65,73 +245,87 @@ export async function generateAIScore(params: {
   extras: RepoExtras;
   healthScores: HealthScore[];
 }): Promise<AIScoreResult | null> {
+  const providerInfo = getProvider();
+  if (!providerInfo) return null;
+
+  const { config, apiKey, resolvedBaseURL, resolvedTimeout } = providerInfo;
+  const model = process.env.AI_MODEL || config.defaultModel;
+
+  const userInput = JSON.stringify(
+    {
+      repo_info: params.repoInfo,
+      languages: params.languages,
+      contributors: params.contributors,
+      recent_commits: params.recentCommits,
+      extras: params.extras,
+      health_scores: params.healthScores,
+    },
+    null,
+    2,
+  );
+
   try {
-    const userInput = JSON.stringify(
-      {
-        repo_info: params.repoInfo,
-        languages: params.languages,
-        contributors: params.contributors,
-        recent_commits: params.recentCommits,
-        extras: params.extras,
-        health_scores: params.healthScores,
-      },
-      null,
-      2
-    );
+    let content: string | null = null;
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userInput },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-    });
+    if (isAnthropicAPI(resolvedBaseURL)) {
+      content = await callAnthropicAPI(
+        resolvedBaseURL!,
+        apiKey,
+        model,
+        SYSTEM_PROMPT,
+        userInput,
+        resolvedTimeout,
+      );
+    } else {
+      const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
+        apiKey,
+        timeout: resolvedTimeout,
+      };
 
-    const content = response.choices[0]?.message?.content;
+      if (resolvedBaseURL) {
+        clientOptions.baseURL = resolvedBaseURL;
+      }
+
+      if (config.headers) {
+        clientOptions.defaultHeaders = config.headers;
+      }
+
+      const client = new OpenAI(clientOptions);
+
+      const response = await client.chat.completions.create({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userInput },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      });
+
+      content = response.choices[0]?.message?.content ?? null;
+    }
+
     if (!content) {
+      console.error("[AI] Empty response from model");
       return null;
     }
 
     const parsed = JSON.parse(content);
-
-    if (
-      typeof parsed.total_score !== "number" ||
-      typeof parsed.summary !== "string" ||
-      !Array.isArray(parsed.dimensions) ||
-      !Array.isArray(parsed.suggestions)
-    ) {
+    if (!validateResult(parsed)) {
+      console.error("[AI] Invalid response structure");
       return null;
     }
 
-    if (parsed.total_score < 0 || parsed.total_score > 100) {
-      return null;
-    }
-
-    for (const dim of parsed.dimensions) {
-      if (
-        typeof dim.name !== "string" ||
-        typeof dim.score !== "number" ||
-        typeof dim.comment !== "string"
-      ) {
-        return null;
-      }
-    }
-
-    for (const sug of parsed.suggestions) {
-      if (typeof sug !== "string") {
-        return null;
-      }
-    }
-
-    return {
-      total_score: parsed.total_score,
-      summary: parsed.summary,
-      dimensions: parsed.dimensions,
-      suggestions: parsed.suggestions,
-    };
-  } catch {
+    return parsed;
+  } catch (error) {
+    const maskedKey = maskApiKey(apiKey);
+    console.error(
+      `[AI] Call failed, provider: ${providerInfo.provider}, model: ${model}, ` +
+      `baseURL: ${resolvedBaseURL || "default"}, timeout: ${resolvedTimeout}ms, key: ${maskedKey}`,
+      error instanceof Error ? error.message : error,
+    );
     return null;
   }
 }
+
+export { maskApiKey, PROVIDERS };

@@ -9,6 +9,20 @@ import type {
 
 const GITHUB_API_BASE = "https://api.github.com";
 
+function getGithubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+    "User-Agent": "repo-check-app",
+  };
+
+  const token = process.env.GITHUB_TOKEN;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 class GitHubApiError extends Error {
   constructor(
     public status: number,
@@ -21,10 +35,7 @@ class GitHubApiError extends Error {
 
 async function githubFetch<T>(url: string): Promise<T> {
   const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "repo-check-app",
-    },
+    headers: getGithubHeaders(),
   });
 
   if (!response.ok) {
@@ -47,10 +58,7 @@ async function githubFetch<T>(url: string): Promise<T> {
 async function githubHead(url: string): Promise<boolean> {
   const response = await fetch(url, {
     method: "HEAD",
-    headers: {
-      Accept: "application/vnd.github.v3+json",
-      "User-Agent": "repo-check-app",
-    },
+    headers: getGithubHeaders(),
   });
 
   return response.ok;
