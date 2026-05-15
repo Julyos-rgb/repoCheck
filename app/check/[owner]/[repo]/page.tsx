@@ -28,10 +28,14 @@ export default function CheckPage() {
   useEffect(() => {
     if (!owner || !repo) return;
 
+    const controller = new AbortController();
+
     setLoading(true);
     setError(null);
 
-    fetch(`/api/repo?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`)
+    fetch(`/api/repo?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`, {
+      signal: controller.signal,
+    })
       .then((res) => {
         if (!res.ok) {
           return res.json().then((body) => {
@@ -41,32 +45,41 @@ export default function CheckPage() {
         return res.json();
       })
       .then((result: RepoAnalysis) => {
+        if (controller.signal.aborted) return;
         setData(result);
         setLoading(false);
-        fetchAIScore(result);
+        fetchAIScore(result, controller.signal);
       })
       .catch((err) => {
+        if (err.name === "AbortError") return;
         setError(err.message || "获取仓库数据失败");
         setLoading(false);
       });
+
+    return () => {
+      controller.abort();
+    };
   }, [owner, repo]);
 
-  const fetchAIScore = (analysis: RepoAnalysis) => {
+  const fetchAIScore = (analysis: RepoAnalysis, signal?: AbortSignal) => {
     setAiLoading(true);
     fetch("/api/ai-score", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(analysis),
+      signal,
     })
       .then((res) => {
         if (!res.ok) return null;
         return res.json();
       })
       .then((result: AIScoreResult | null) => {
+        if (signal?.aborted) return;
         setAiScore(result);
         setAiLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err.name === "AbortError") return;
         setAiScore(null);
         setAiLoading(false);
       });
