@@ -6,9 +6,35 @@
 
 - **仓库搜索** — 输入 GitHub 仓库 URL，一键跳转分析
 - **数据可视化** — 概览卡片、语言分布饼图、提交活跃度柱状图、贡献者排行、健康度雷达图
-- **6 维度健康评分** — 社区活跃度、维护状态、文档完善度、代码质量、Issue 响应率、贡献者多样性
+- **6 维度健康评分** — 代码活跃度、社区健康度、文档完善度、工程规范度、技术生态度、维护可持续性
 - **AI 智能评分** — 支持多种大模型（OpenAI、Anthropic Claude、DeepSeek、通义千问、智谱 GLM、Moonshot、MiniMax），提供综合评分、各维度评语和改进建议
 - **响应式设计** — 支持桌面端和移动端浏览
+
+## 预览
+
+> 📸 运行项目后可截取实际截图替换下方占位图
+
+**首页搜索**
+
+![首页搜索](https://via.placeholder.com/800x450?text=RepoCheck+首页搜索页)
+
+**体检结果 — 概览与图表**
+
+![体检结果](https://via.placeholder.com/800x450?text=体检结果+概览与图表)
+
+**AI 智能评分**
+
+![AI 评分](https://via.placeholder.com/800x450?text=AI+智能评分报告)
+
+## 使用案例
+
+输入任意公开 GitHub 仓库 URL，即可获得全面的体检报告：
+
+```
+https://github.com/facebook/react
+https://github.com/vercel/next.js
+https://github.com/Julyos-rgb/repoCheck
+```
 
 ## 技术栈
 
