@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       languages,
       contributors,
       extras,
+      commitActivity,
     });
 
     const result: RepoAnalysis = {

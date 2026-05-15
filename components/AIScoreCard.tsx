@@ -2,6 +2,15 @@
 
 import type { AIScoreResult } from "@/types";
 
+const DIMENSION_NAMES: Record<string, string> = {
+  activity: "代码活跃度",
+  community: "社区健康度",
+  documentation: "文档完善度",
+  engineering: "工程规范度",
+  ecosystem: "技术生态度",
+  sustainability: "维护可持续性",
+};
+
 interface AIScoreCardProps {
   repoInfo: { full_name: string };
   aiScore: AIScoreResult | null;
@@ -90,15 +99,17 @@ function DimensionCard({
   score: number;
   comment: string;
 }) {
-  const color = getScoreColor(score);
-  const barWidth = Math.min(score, 100);
+  const displayScore = score * 5;
+  const color = getScoreColor(displayScore);
+  const barWidth = Math.min(displayScore, 100);
+  const label = DIMENSION_NAMES[name] || name;
 
   return (
     <div className="rounded-xl border border-white/[0.06] bg-[#111827]/80 p-4 backdrop-blur-sm transition-colors hover:border-white/[0.12]">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-300">{name}</span>
+        <span className="text-sm font-medium text-gray-300">{label}</span>
         <span className="text-sm font-bold" style={{ color }}>
-          {score}
+          {displayScore}
           <span className="ml-0.5 text-xs text-gray-500">/100</span>
         </span>
       </div>

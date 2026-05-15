@@ -58,12 +58,12 @@ export interface CommitActivity {
 }
 
 export type HealthDimension =
+  | "activity"
   | "community"
-  | "maintenance"
   | "documentation"
-  | "code_quality"
-  | "issue_response"
-  | "contributor_diversity";
+  | "engineering"
+  | "ecosystem"
+  | "sustainability";
 
 export interface HealthScore {
   dimension: HealthDimension;

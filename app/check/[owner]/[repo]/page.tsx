@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import type { RepoAnalysis, AIScoreResult } from "@/types";
+import { calculateTotalScore } from "@/lib/score";
 import RepoHeader from "@/components/RepoHeader";
 import OverviewCards from "@/components/OverviewCards";
 import LanguageChart from "@/components/LanguageChart";
@@ -180,8 +181,13 @@ export default function CheckPage() {
             <ContributorChart contributors={data.contributors} />
           </div>
           <div className="rounded-2xl border border-white/[0.06] bg-[#0d1117] p-6">
-            <h2 className="mb-4 text-lg font-semibold text-gray-200">
+            <h2 className="mb-4 text-lg font-semibold text-gray-200 flex items-center gap-3">
               仓库健康度
+              {data.health_scores.length > 0 && (
+                <span className="text-2xl font-bold text-cyan-400">
+                  {calculateTotalScore(data.health_scores)}分
+                </span>
+              )}
             </h2>
             <HealthRadar scores={data.health_scores} />
           </div>
